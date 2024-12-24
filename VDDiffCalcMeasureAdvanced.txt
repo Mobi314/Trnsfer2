@@ -1,0 +1,191 @@
+CurrentValue =
+SUM('ValueDriver'[Total Benefit $m])
+
+
+
+SelectedDate =
+SELECTEDVALUE('ValueDriver'[Date])
+
+
+
+
+StartOfCurrentQuarter_Measure =
+VAR ThisDate  = [SelectedDate]  -- from measure above
+VAR ThisMonth = MONTH(ThisDate)
+VAR ThisYear  = YEAR(ThisDate)
+RETURN
+SWITCH(
+    TRUE(),
+    ThisMonth IN {4, 5, 6},       DATE(ThisYear, 4, 1),
+    ThisMonth IN {7, 8, 9},       DATE(ThisYear, 7, 1),
+    ThisMonth IN {10, 11, 12},    DATE(ThisYear, 10, 1),
+    DATE(ThisYear, 1, 1)
+)
+
+
+
+
+StartOfLastQuarter_Measure =
+EDATE([StartOfCurrentQuarter_Measure], -3)
+
+
+
+
+StartOf2QuartersAgo_Measure =
+EDATE([StartOfCurrentQuarter_Measure], -6)
+
+
+
+
+StartOf3QuartersAgo_Measure =
+EDATE([StartOfCurrentQuarter_Measure], -9)
+
+
+
+
+EarliestDateInData_Measure =
+CALCULATE(
+    MIN('ValueDriver'[Date]),
+    ALL('ValueDriver')
+)
+
+
+
+
+ValueAtStartOfCurrentQuarter =
+VAR SoCQ = [StartOfCurrentQuarter_Measure]
+VAR ClosestDateInWindow =
+    CALCULATE(
+        MIN('ValueDriver'[Date]),
+        ALL('ValueDriver'),  -- removes current date filters
+        'ValueDriver'[Date] >= (SoCQ - 1),
+        'ValueDriver'[Date] <= (SoCQ + 7)
+    )
+VAR Result =
+    CALCULATE(
+        SUM('ValueDriver'[Total Benefit $m]),
+        ALL('ValueDriver'),  -- remove current date filter
+        'ValueDriver'[Date] = ClosestDateInWindow
+    )
+RETURN
+COALESCE(Result, 0)
+
+
+
+
+ValueAtStartOfLastQuarter =
+VAR SoLQ = [StartOfLastQuarter_Measure]
+VAR ClosestDateInWindow =
+    CALCULATE(
+        MIN('ValueDriver'[Date]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] >= (SoLQ - 1),
+        'ValueDriver'[Date] <= (SoLQ + 7)
+    )
+VAR Result =
+    CALCULATE(
+        SUM('ValueDriver'[Total Benefit $m]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] = ClosestDateInWindow
+    )
+RETURN
+COALESCE(Result, 0)
+
+
+
+
+
+ValueAtStartOf2QuartersAgo =
+VAR So2Q = [StartOf2QuartersAgo_Measure]
+VAR ClosestDateInWindow =
+    CALCULATE(
+        MIN('ValueDriver'[Date]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] >= (So2Q - 1),
+        'ValueDriver'[Date] <= (So2Q + 7)
+    )
+VAR Result =
+    CALCULATE(
+        SUM('ValueDriver'[Total Benefit $m]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] = ClosestDateInWindow
+    )
+RETURN
+COALESCE(Result, 0)
+
+
+
+
+
+ValueAtStartOf3QuartersAgo =
+VAR So3Q = [StartOf3QuartersAgo_Measure]
+VAR ClosestDateInWindow =
+    CALCULATE(
+        MIN('ValueDriver'[Date]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] >= (So3Q - 1),
+        'ValueDriver'[Date] <= (So3Q + 7)
+    )
+VAR Result =
+    CALCULATE(
+        SUM('ValueDriver'[Total Benefit $m]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] = ClosestDateInWindow
+    )
+RETURN
+COALESCE(Result, 0)
+
+
+
+
+
+
+ValueAtEarliestDate =
+VAR earliest = [EarliestDateInData_Measure]
+VAR ClosestDateInWindow =
+    CALCULATE(
+        MIN('ValueDriver'[Date]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] >= (earliest - 1),
+        'ValueDriver'[Date] <= (earliest + 7)
+    )
+VAR Result =
+    CALCULATE(
+        SUM('ValueDriver'[Total Benefit $m]),
+        ALL('ValueDriver'),
+        'ValueDriver'[Date] = ClosestDateInWindow
+    )
+RETURN
+COALESCE(Result, 0)
+
+
+
+
+
+Diff_CurrVsStartOfCurrentQuarter_Measure =
+[CurrentValue] - [ValueAtStartOfCurrentQuarter]
+
+
+
+
+Diff_CurrVsStartOfLastQuarter_Measure =
+[CurrentValue] - [ValueAtStartOfLastQuarter]
+
+
+
+
+Diff_CurrVsStartOf2QuartersAgo_Measure =
+[CurrentValue] - [ValueAtStartOf2QuartersAgo]
+
+
+
+
+
+Diff_CurrVsStartOf3QuartersAgo_Measure =
+[CurrentValue] - [ValueAtStartOf3QuartersAgo]
+
+
+
+
+Diff_CurrVsEarliestDate_Measure =
+[CurrentValue] - [ValueAtEarliestDate]
