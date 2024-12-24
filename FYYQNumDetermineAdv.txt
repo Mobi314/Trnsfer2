@@ -1,0 +1,157 @@
+FY = IF(MONTH(d) < 4, YEAR(d) - 1, YEAR(d))
+
+
+
+FQ = 
+SWITCH(
+  TRUE(),
+  MONTH(d) IN {4,5,6},     1,   // Apr–Jun -> Q1
+  MONTH(d) IN {7,8,9},     2,   // Jul–Sep -> Q2
+  MONTH(d) IN {10,11,12},  3,   // Oct–Dec -> Q3
+  4                            // Jan–Mar -> Q4
+)
+
+
+
+
+VsStartOfCurrentQuarter_Label =
+VAR d = [StartOfCurrentQuarter_Measure]  -- e.g. 10/1/2024
+VAR calYear = YEAR(d)
+VAR calMonth = MONTH(d)
+
+// 1) Fiscal Year
+VAR fy = 
+    IF(calMonth < 4, calYear - 1, calYear)
+
+// 2) Quarter
+VAR fq =
+    SWITCH(
+        TRUE(),
+        calMonth IN {4,5,6},      1,
+        calMonth IN {7,8,9},      2,
+        calMonth IN {10,11,12},   3,
+        4
+    )
+
+RETURN
+IF(
+    ISBLANK(d),
+    BLANK(),
+    "Vs. F" & fy & " Q" & fq & " Start"
+)
+
+
+
+
+
+
+
+VsStartOfLastQuarter_Label =
+VAR d = [StartOfLastQuarter_Measure]      -- e.g. 10/1/2024
+VAR calYear = YEAR(d)
+VAR calMonth = MONTH(d)
+
+VAR fy = IF(calMonth < 4, calYear - 1, calYear)
+VAR fq =
+    SWITCH(
+        TRUE(),
+        calMonth IN {4,5,6},      1,
+        calMonth IN {7,8,9},      2,
+        calMonth IN {10,11,12},   3,
+        4
+    )
+
+RETURN
+IF(
+    ISBLANK(d),
+    BLANK(),
+    "Vs. F" & fy & " Q" & fq & " Start"
+)
+
+
+
+
+
+
+
+
+VsStartOf2QuartersAgo_Label =
+VAR d = [StartOf2QuartersAgo_Measure]
+VAR calYear = YEAR(d)
+VAR calMonth = MONTH(d)
+
+VAR fy = IF(calMonth < 4, calYear - 1, calYear)
+VAR fq =
+    SWITCH(
+        TRUE(),
+        calMonth IN {4,5,6},      1,
+        calMonth IN {7,8,9},      2,
+        calMonth IN {10,11,12},   3,
+        4
+    )
+
+RETURN
+IF(
+    ISBLANK(d),
+    BLANK(),
+    "Vs. F" & fy & " Q" & fq & " Start"
+)
+
+
+
+
+
+
+
+
+VsStartOf3QuartersAgo_Label =
+VAR d = [StartOf3QuartersAgo_Measure]
+VAR calYear = YEAR(d)
+VAR calMonth = MONTH(d)
+
+VAR fy = IF(calMonth < 4, calYear - 1, calYear)
+VAR fq =
+    SWITCH(
+        TRUE(),
+        calMonth IN {4,5,6},      1,
+        calMonth IN {7,8,9},      2,
+        calMonth IN {10,11,12},   3,
+        4
+    )
+
+RETURN
+IF(
+    ISBLANK(d),
+    BLANK(),
+    "Vs. F" & fy & " Q" & fq & " Start"
+)
+
+
+
+
+
+
+
+
+
+VsEarliestDateInData_Label =
+VAR d = [EarliestDateInData_Measure]
+VAR calYear = YEAR(d)
+VAR calMonth = MONTH(d)
+
+VAR fy = IF(calMonth < 4, calYear - 1, calYear)
+VAR fq =
+    SWITCH(
+        TRUE(),
+        calMonth IN {4,5,6},      1,
+        calMonth IN {7,8,9},      2,
+        calMonth IN {10,11,12},   3,
+        4
+    )
+
+RETURN
+IF(
+    ISBLANK(d),
+    BLANK(),
+    "Vs. F" & fy & " Q" & fq & " Start (Earliest Data)"
+)
