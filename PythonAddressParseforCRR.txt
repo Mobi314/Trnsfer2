@@ -1,46 +1,51 @@
-from ayx import Alteryx
+from ayx import Alteryx, Package
+import pandas as pd
 import re
 
 def parse_postal_addresses(xml_string):
     """
-    Given a large string (xml_string), find the first occurrence of 'address1' and 'countryName'
-    after 'Company Registered Address'. Return '<address1>, <countryName>' or None if not found.
+    Given a string (xml_string), find the first occurrence of 'address1' and 'countryName'
+    AFTER 'Company Registered Address'. Return '<address1>, <countryName>' or None if not found.
     """
-    if not xml_string:
+    if not xml_string or not isinstance(xml_string, str):
         return None
     
-    # Regex to anchor on 'Company Registered Address', then find address1 and countryName
+    # Regex anchored on 'Company Registered Address'
+    # Looks for the first 'address1': '...' and 'countryName': '...' afterwards
     pattern = r"'Company Registered Address'.*?'address1'\s*:\s*'([^']+)'.*?'countryName'\s*:\s*'([^']+)'"
     match = re.search(pattern, xml_string, re.DOTALL)
+    
     if match:
-        # Group 1 = address1, Group 2 = countryName
-        return f"{match.group(1)}, {match.group(2)}"
+        address1 = match.group(1)
+        country  = match.group(2)
+        return f"{address1}, {country}"
     return None
 
-# -------------------------------------------
-# Process Input #1 (top input anchor)
-# -------------------------------------------
-for row in Alteryx.read("#1"):
-    # row is a dict of all fields in the record, e.g. row["postalAddresses"], row["SomeOtherField"], etc.
-    xml_string = row.get("postalAddresses", "")
-    
-    # Parse out the needed part
-    registered_address = parse_postal_addresses(xml_string)
-    
-    # Store the result in a new field
-    row["Registered Address"] = registered_address if registered_address else ""
-    
-    # Write out this modified row to output #1
-    Alteryx.write(row, 1)
+# ---------------------------------------------------------
+# 1) Read incoming data #1 as a DataFrame
+# ---------------------------------------------------------
+df1 = Alteryx.read("#1")  # This should be a pandas DataFrame (if configured)
 
-# -------------------------------------------
-# Process Input #2 (bottom input anchor)
-# -------------------------------------------
-for row in Alteryx.read("#2"):
-    xml_string = row.get("postalAddresses", "")
-    
-    registered_address = parse_postal_addresses(xml_string)
-    row["Registered Address"] = registered_address if registered_address else ""
-    
-    # Write out this modified row to output #2
-    Alteryx.write(row, 2)
+# Parse 'postalAddresses' column to create a new 'Registered Address' column
+if "postalAddresses" in df1.columns:
+    df1["Registered Address"] = df1["postalAddresses"].apply(parse_postal_addresses)
+else:
+    # If the column doesn't exist, create an empty one
+    df1["Registered Address"] = None
+
+# Write updated df1 to output anchor #1
+Alteryx.write(df1, 1)
+
+# ---------------------------------------------------------
+# 2) Read incoming data #2 as a DataFrame
+# ---------------------------------------------------------
+df2 = Alteryx.read("#2")  # This should be a pandas DataFrame (if configured)
+
+# Parse 'postalAddresses' column
+if "postalAddresses" in df2.columns:
+    df2["Registered Address"] = df2["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df2["Registered Address"] = None
+
+# Write updated df2 to output anchor #2
+Alteryx.write(df2, 2)
