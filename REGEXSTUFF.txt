@@ -1,2 +1,8 @@
 'address1':'([^']+)'.*?'countryName':'([^']+)' 
 'Company Registered Address'(?s).*?'address1':'([^']+)'.*?'countryName':'([^']+)'
+'Company Registered Address'[\\s\\S]*?'address1':'([^']+)'[\\s\\S]*?'countryName':'([^']+)'
+REGEX_Replace(
+  [XMLField],
+  "'Company Registered Address'(?s).*?'address1':'([^']+)'.*?'countryName':'([^']+)'",
+  "$1, $2"
+)
