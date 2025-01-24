@@ -1,0 +1,56 @@
+from ayx import Alteryx
+import re
+
+# Helper function to parse the postalAddresses field
+def parse_postal_addresses(xml_string):
+    """
+    Given a large string (xml_string), find the first occurrence of 'address1' and 'countryName'
+    after the 'Company Registered Address' parent node. 
+    Return a single string: "<address1>, <countryName>" or None if not found.
+    """
+    if not xml_string:
+        return None
+
+    # Regex to anchor on 'Company Registered Address', then look for address1 and countryName
+    # in a non-greedy (DOTALL) manner.
+    pattern = r"'Company Registered Address'.*?'address1'\s*:\s*'([^']+)'.*?'countryName'\s*:\s*'([^']+)'"
+    match = re.search(pattern, xml_string, re.DOTALL)
+    
+    if match:
+        address1 = match.group(1)
+        country = match.group(2)
+        return f"{address1}, {country}"
+    
+    return None
+
+# ------------------------------------
+# Process Input #1
+# ------------------------------------
+for index, row in Alteryx.read("#1"):
+    # Retrieve the 'postalAddresses' field. Adjust field name if different.
+    xml_string = row.get("postalAddresses", "")
+    
+    # Parse out the needed values
+    registered_address = parse_postal_addresses(xml_string)
+    
+    # Store result in a new field
+    row["Registered Address"] = registered_address if registered_address else ""
+    
+    # Write this row to output anchor #1
+    Alteryx.write(row, 1)
+
+# ------------------------------------
+# Process Input #2
+# ------------------------------------
+for index, row in Alteryx.read("#2"):
+    # Retrieve the 'postalAddresses' field
+    xml_string = row.get("postalAddresses", "")
+    
+    # Parse out the needed values
+    registered_address = parse_postal_addresses(xml_string)
+    
+    # Store result in a new field
+    row["Registered Address"] = registered_address if registered_address else ""
+    
+    # Write this row to output anchor #2
+    Alteryx.write(row, 2)
