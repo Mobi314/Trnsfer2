@@ -49,3 +49,55 @@ else:
 
 # Write updated df2 to output anchor #2
 Alteryx.write(df2, 2)
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import pandas as pd
+import re
+
+def parse_postal_addresses(xml_string):
+    """
+    Given a large string (xml_string), find the first occurrence of
+    address1, cityName, and countryName after Company Registered Address.
+    Return "<address1>, <cityName>, <countryName>" or None if not found.
+    """
+    if not xml_string or not isinstance(xml_string, str):
+        return None
+
+    pattern = r"'Company Registered Address'.*?'address1'\s*:\s*'([^']+)'.*?'cityName'\s*:\s*'([^']+)'.*?'countryName'\s*:\s*'([^']+)'"
+    match = re.search(pattern, xml_string, re.DOTALL)
+
+    if match:
+        address1 = match.group(1)
+        cityName = match.group(2)
+        country  = match.group(3)
+        return f"{address1}, {cityName}, {country}"
+    return None
+
+# ---------------------------------------------------------
+# Read incoming data #1 as a DataFrame
+# ---------------------------------------------------------
+df1 = Alteryx.read("#1")  # must be configured as DataFrame input
+if "postalAddresses" in df1.columns:
+    df1["Registered Address"] = df1["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df1["Registered Address"] = None
+
+Alteryx.write(df1, 1)
+
+# ---------------------------------------------------------
+# Read incoming data #2 as a DataFrame
+# ---------------------------------------------------------
+df2 = Alteryx.read("#2")  # must be configured as DataFrame input
+if "postalAddresses" in df2.columns:
+    df2["Registered Address"] = df2["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df2["Registered Address"] = None
+
+Alteryx.write(df2, 2)
