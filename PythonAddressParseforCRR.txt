@@ -236,3 +236,85 @@ else:
 Alteryx.write(df2, 2)
 
 Alteryx.write(df2, 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import pandas as pd
+import re
+
+def parse_postal_addresses_universal(raw_string):
+    if not raw_string or not isinstance(raw_string, str):
+        return "COULD NOT PARSE ADDRESS"
+    
+    code_pattern = re.compile(
+        r'[\"\']code[\"\']\s*:\s*([\"\'])REG\1(.*)',
+        re.DOTALL
+    )
+    code_match = code_pattern.search(raw_string)
+    if not code_match:
+        return "COULD NOT PARSE ADDRESS"
+    
+    substring_after_reg = code_match.group(2)
+    
+    def find_field(substring, field_name):
+        pattern = re.compile(
+            rf'[\"\']{field_name}[\"\']\s*:\s*([\"\'])(?P<val>.*?)(\1)',
+            re.DOTALL
+        )
+        m = pattern.search(substring)
+        return m.group('val') if m else None
+
+    address1    = find_field(substring_after_reg, "address1")
+    postal_code = find_field(substring_after_reg, "postalCode")
+    city_name   = find_field(substring_after_reg, "cityName")
+    country     = find_field(substring_after_reg, "countryName")
+
+    all_missing = (address1 is None and 
+                   postal_code is None and 
+                   city_name is None and 
+                   country is None)
+    if all_missing:
+        return "COULD NOT PARSE ADDRESS"
+    
+    if address1 is None:
+        return "COULD NOT PARSE address1"
+    if postal_code is None:
+        return "COULD NOT PARSE postalCode"
+    if city_name is None:
+        return "COULD NOT PARSE cityName"
+    if country is None:
+        return "COULD NOT PARSE countryName"
+
+    return f"{address1}, {postal_code}, {city_name}, {country}"
+
+
+# Read input #1 as DataFrame
+df1 = Alteryx.read("#1")  # Configure Input #1 as DataFrame
+if "postalAddresses" in df1.columns:
+    df1["Registered Address"] = df1["postalAddresses"].apply(parse_postal_addresses_universal)
+else:
+    df1["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df1, 1)
+
+# Read input #2 as DataFrame
+df2 = Alteryx.read("#2")  # Configure Input #2 as DataFrame
+if "postalAddresses" in df2.columns:
+    df2["Registered Address"] = df2["postalAddresses"].apply(parse_postal_addresses_universal)
+else:
+    df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df2, 2)
