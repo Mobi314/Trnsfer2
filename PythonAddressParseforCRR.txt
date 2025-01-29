@@ -438,3 +438,118 @@ else:
     df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
 
 Alteryx.write(df2, 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import pandas as pd
+import re
+
+def parse_postal_addresses(raw_string):
+    if not raw_string or not isinstance(raw_string, str):
+        return "COULD NOT PARSE ADDRESS"
+
+    # --- Find substring from code:'REG' to next 'code': or end of string ---
+    segment_pattern = re.compile(
+        r'[\"\']code[\"\']\s*:\s*([\"\'])REG\1'
+        r'(.*?)'
+        r'(?=[\"\']code[\"\']|$)',
+        re.DOTALL
+    )
+    m = segment_pattern.search(raw_string)
+    if not m:
+        return "COULD NOT PARSE ADDRESS"
+
+    segment_for_reg = m.group(2)
+
+    def find_address(sub):
+        pat = re.compile(
+            r'[\"\'](?:address1|address)[\"\']\s*:\s*([\"\'])(?P<val>.*?)(\1)',
+            re.DOTALL
+        )
+        match = pat.search(sub)
+        return match.group('val') if match else None
+
+    def find_postalCode(sub):
+        pat = re.compile(
+            r'[\"\']postalCode[\"\']\s*:\s*([\"\'])(?P<val>.*?)(\1)',
+            re.DOTALL
+        )
+        match = pat.search(sub)
+        return match.group('val') if match else None
+
+    def find_cityName(sub):
+        pat = re.compile(
+            r'[\"\']cityName[\"\']\s*:\s*([\"\'])(?P<val>.*?)(\1)',
+            re.DOTALL
+        )
+        match = pat.search(sub)
+        return match.group('val') if match else None
+
+    def find_countryName(sub):
+        pat = re.compile(
+            r'[\"\']countryName[\"\']\s*:\s*([\"\'])(?P<val>.*?)(\1)',
+            re.DOTALL
+        )
+        match = pat.search(sub)
+        return match.group('val') if match else None
+
+    address_val = find_address(segment_for_reg)
+    postal_val  = find_postalCode(segment_for_reg)
+    city_val    = find_cityName(segment_for_reg)
+    country_val = find_countryName(segment_for_reg)
+
+    # Check missing
+    all_missing = (address_val is None 
+                   and postal_val is None
+                   and city_val is None
+                   and country_val is None)
+    if all_missing:
+        return "COULD NOT PARSE ADDRESS"
+
+    if address_val is None:
+        return "COULD NOT PARSE address1/address"
+    if postal_val is None:
+        return "COULD NOT PARSE postalCode"
+    if city_val is None:
+        return "COULD NOT PARSE cityName"
+    if country_val is None:
+        return "COULD NOT PARSE countryName"
+
+    return f"{address_val}, {postal_val}, {city_val}, {country_val}"
+
+
+# --------------------------------------------------------
+# Process Input #1
+# --------------------------------------------------------
+df1 = Alteryx.read("#1")  # DataFrame input
+if "postalAddresses" in df1.columns:
+    df1["Registered Address"] = df1["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df1["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df1, 1)
+
+# --------------------------------------------------------
+# Process Input #2
+# --------------------------------------------------------
+df2 = Alteryx.read("#2")  # DataFrame input
+if "postalAddresses" in df2.columns:
+    df2["Registered Address"] = df2["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df2, 2)
