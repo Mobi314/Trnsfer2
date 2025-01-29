@@ -1,0 +1,15 @@
+Program FY Budget Measure =
+SUMX(
+    VALUES('CombinedSnapshot'[Program JIRA Key]), 
+    CALCULATE(
+        MAX('CombinedSnapshot'[Program FY Bud])
+    )
+)
+
+Program FY Forecast Measure =
+SUMX(
+    VALUES('CombinedSnapshot'[Program JIRA Key]), 
+    CALCULATE(
+        MAX('CombinedSnapshot'[Program FY Fcst])
+    )
+)
