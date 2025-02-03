@@ -1,0 +1,13 @@
+API_URL = 
+IF [RowIndex] = 0 THEN 
+    // First chunk
+    [URL_Beginning] 
+    + "&maxResults=250" 
+    + [URL_Ending]
+ELSE
+    // Subsequent chunks
+    [URL_Beginning] 
+    + "&maxResults=250" 
+    + "&startAt=" + ToString([RowIndex] * 250) 
+    + [URL_Ending]
+ENDIF
