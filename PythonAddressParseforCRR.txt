@@ -776,3 +776,114 @@ else:
     df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
 
 Alteryx.write(df2, 2)
+
+
+
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import pandas as pd
+import re
+
+def parse_postal_addresses(raw_string):
+    if not raw_string or not isinstance(raw_string, str):
+        return "COULD NOT PARSE ADDRESS"
+
+    # --- Identify code:'REG' block ---
+    segment_pattern = re.compile(
+        r'[\"\']code[\"\']\s*:\s*([\"\'])REG\1'
+        r'(.*?)'
+        r'(?=[\"\']code[\"\']|$)',
+        re.DOTALL
+    )
+    match = segment_pattern.search(raw_string)
+    if not match:
+        return "COULD NOT PARSE ADDRESS"
+
+    segment_for_reg = match.group(2)
+
+    # --- Find all addressN fields (e.g., address1, address2, etc.) ---
+    address_pattern = re.compile(
+        r'[\"\'](address(?P<num>\d+))[\"\']\s*:\s*([\"\'])(?P<val>.*?)(\3)',
+        re.DOTALL
+    )
+    addresses = []
+    for addr_match in address_pattern.finditer(segment_for_reg):
+        num_str = addr_match.group('num')
+        val     = addr_match.group('val')
+        
+        # Skip if empty or 3-5 dots only
+        if not val or re.match(r'^\.{3,5}$', val):
+            continue
+        
+        addresses.append((int(num_str), val))
+
+    addresses.sort(key=lambda x: x[0])
+    address_values = [item[1] for item in addresses]
+
+    # If no addresses remain => single placeholder
+    if not address_values:
+        address_values = ["address:BLANK"]
+
+    # --- Single-field lookups for postalCode, cityName, countryName ---
+    def find_single_field(sub, field_name):
+        pat = re.compile(
+            rf'[\"\']{field_name}[\"\']\s*:\s*([\"\'])(?P<val>.*?)(\1)',
+            re.DOTALL
+        )
+        m = pat.search(sub)
+        if not m:
+            return None
+        return m.group('val')
+
+    postal_val  = find_single_field(segment_for_reg, "postalCode")
+    city_val    = find_single_field(segment_for_reg, "cityName")
+    country_val = find_single_field(segment_for_reg, "countryName")
+
+    def finalize_field(value, placeholder):
+        if not value:
+            return f"{placeholder}:BLANK"
+        return value
+
+    postal_out  = finalize_field(postal_val,  "postalCode")
+    city_out    = finalize_field(city_val,    "cityName")
+    country_out = finalize_field(country_val, "countryName")
+
+    # --- If everything is placeholders => "COULD NOT PARSE ADDRESS" ---
+    if (address_values == ["address:BLANK"] and
+        postal_out  == "postalCode:BLANK"   and
+        city_out    == "cityName:BLANK"     and
+        country_out == "countryName:BLANK"):
+        return "COULD NOT PARSE ADDRESS"
+
+    # --- Build final string ---
+    combined = address_values + [postal_out, city_out, country_out]
+    return ", ".join(combined)
+
+# -----------------------------------------------------------
+# Process Input #1
+# -----------------------------------------------------------
+df1 = Alteryx.read("#1")  # DataFrame input
+if "postalAddresses" in df1.columns:
+    df1["Registered Address"] = df1["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df1["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df1, 1)
+
+# -----------------------------------------------------------
+# Process Input #2
+# -----------------------------------------------------------
+df2 = Alteryx.read("#2")  # DataFrame input
+if "postalAddresses" in df2.columns:
+    df2["Registered Address"] = df2["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df2, 2)
