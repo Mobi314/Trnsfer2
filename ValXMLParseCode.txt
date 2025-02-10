@@ -1,23 +1,22 @@
 import re
 
-# Convert the entire recordOrganisations column to string upfront.
+# Convert recordOrganisations to string, just to be safe
 df_TradeAccounts['recordOrganisations'] = df_TradeAccounts['recordOrganisations'].astype(str)
 
-def parse_sella(xml_str, field_name):
-    if not re.search(r"'organisationRole'\s*:\s*'SELLA'", xml_str):
-        return None
-    pattern = fr"'{field_name}'\s*:\s*'([^']*)'"
-    m = re.search(pattern, xml_str)
-    if not m:
-        return None
-    sub = re.search(r"NOMURA\s+(.*?)\s*\(SALES OFFICE\)", m.group(1))
-    return sub.group(1).strip() if sub else None
+# Precompile two simple regexes:
+#   e.g. `'longName':'NOMURA NEW YORK (SALES OFFICE)'`
+pattern_long = re.compile(r"'longName'\s*:\s*'NOMURA\s+([^']+)\s*\(SALES OFFICE\)'")
+pattern_full = re.compile(r"'fullName'\s*:\s*'NOMURA\s+([^']+)\s*\(SALES OFFICE\)'")
+
+def parse_city(pattern, text):
+    match = pattern.search(text)
+    return match.group(1).strip() if match else None
 
 df_TradeAccounts['recordOrganisation longName'] = df_TradeAccounts['recordOrganisations'].apply(
-    lambda x: parse_sella(x, 'longName')
+    lambda x: parse_city(pattern_long, x)
 )
 df_TradeAccounts['recordOrganisation fullName'] = df_TradeAccounts['recordOrganisations'].apply(
-    lambda x: parse_sella(x, 'fullName')
+    lambda x: parse_city(pattern_full, x)
 )
 
 Alteryx.write(df_TradeAccounts, 1)
