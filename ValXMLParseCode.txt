@@ -1,5 +1,8 @@
 import re
 
+# Convert the entire recordOrganisations column to string upfront.
+df_TradeAccounts['recordOrganisations'] = df_TradeAccounts['recordOrganisations'].astype(str)
+
 def parse_sella(xml_str, field_name):
     if not re.search(r"'organisationRole'\s*:\s*'SELLA'", xml_str):
         return None
