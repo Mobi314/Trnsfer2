@@ -20,3 +20,30 @@ df_TradeAccounts['recordOrganisation fullName'] = df_TradeAccounts['recordOrgani
 )
 
 Alteryx.write(df_TradeAccounts, 1)
+
+
+
+
+import re
+
+# Ensure everything is string
+df_TradeAccounts['recordOrganisations'] = df_TradeAccounts['recordOrganisations'].astype(str)
+
+# Regex to capture the text that appears after "NOMURA " and before " (SALES OFFICE)" 
+# inside <longName>...</longName> and <fullName>...</fullName>.
+pattern_long = re.compile(r"<longName>\s*NOMURA\s+([^<]+)\s*\(SALES OFFICE\)\s*</longName>")
+pattern_full = re.compile(r"<fullName>\s*NOMURA\s+([^<]+)\s*\(SALES OFFICE\)\s*</fullName>")
+
+def extract_value(xml_str, pattern):
+    m = pattern.search(xml_str)
+    return m.group(1).strip() if m else None
+
+df_TradeAccounts['recordOrganisation longName'] = df_TradeAccounts['recordOrganisations'].apply(
+    lambda x: extract_value(x, pattern_long)
+)
+
+df_TradeAccounts['recordOrganisation fullName'] = df_TradeAccounts['recordOrganisations'].apply(
+    lambda x: extract_value(x, pattern_full)
+)
+
+Alteryx.write(df_TradeAccounts, 1)
