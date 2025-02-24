@@ -1134,3 +1134,140 @@ else:
     df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
 
 Alteryx.write(df2, 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import pandas as pd
+import re
+
+def clean_text(value):
+    """
+    Returns:
+      - None if `value` is empty or contains only periods (after stripping).
+      - Otherwise, the stripped text.
+    """
+    if not value or not isinstance(value, str):
+        return None
+    val = value.strip()
+    # If empty or only periods -> None
+    if not val:
+        return None
+    if re.match(r'^\.+$', val):
+        return None
+    return val  # valid text
+
+def extract_reg_postal_address_block(xml_str):
+    if not xml_str or not isinstance(xml_str, str):
+        return None
+    # Find all <postalAddress>...</postalAddress> blocks
+    pattern = re.compile(r"<postalAddress>(.*?)</postalAddress>", re.DOTALL)
+    blocks = pattern.findall(xml_str)
+    for block_content in blocks:
+        # Check if <code>REG</code> is inside
+        if re.search(r"<code>\s*REG\s*</code>", block_content, re.DOTALL):
+            return block_content.strip()
+    return None
+
+def extract_all_addresses(xml_str):
+    """
+    Finds <addressN>...</addressN> pairs and returns a list of
+    cleaned address strings in ascending numeric order.
+    Skips any that are empty or all periods.
+    """
+    pattern = re.compile(r"<address(\d+)>(.*?)</address\1>", re.DOTALL)
+    matches = pattern.findall(xml_str)
+
+    addresses = []
+    for num_str, address_text in matches:
+        cleaned = clean_text(address_text)
+        if cleaned:
+            addresses.append((int(num_str), cleaned))
+    addresses.sort(key=lambda x: x[0])
+    return [txt for (_, txt) in addresses]
+
+def extract_city_name(xml_str):
+    match = re.search(r"<cityName>(.*?)</cityName>", xml_str, re.DOTALL)
+    val = match.group(1) if match else None
+    return clean_text(val)
+
+def extract_postal_code(xml_str):
+    match = re.search(r"<postalCode>(.*?)</postalCode>", xml_str, re.DOTALL)
+    val = match.group(1) if match else None
+    return clean_text(val)
+
+def extract_country_name(xml_str):
+    match = re.search(r"<countryName>(.*?)</countryName>", xml_str, re.DOTALL)
+    val = match.group(1) if match else None
+    return clean_text(val)
+
+def parse_postal_addresses(xml_str):
+    """
+    1) Locate first <postalAddress> block containing <code>REG</code>.
+    2) Extract <address#>, <cityName>, <postalCode>, <countryName>.
+       - Filter out empty or '...' style values.
+    3) Return them in order: addresses..., cityName, postalCode, countryName.
+    4) If none found => "COULD NOT PARSE ADDRESS".
+    """
+    reg_block = extract_reg_postal_address_block(xml_str)
+    if not reg_block:
+        return "COULD NOT PARSE ADDRESS"
+
+    addresses = extract_all_addresses(reg_block)
+    city_val  = extract_city_name(reg_block)
+    post_val  = extract_postal_code(reg_block)
+    ctry_val  = extract_country_name(reg_block)
+
+    final_parts = []
+    # addresses first
+    final_parts.extend(addresses)
+    # cityName
+    if city_val:
+        final_parts.append(city_val)
+    # postalCode
+    if post_val:
+        final_parts.append(post_val)
+    # countryName
+    if ctry_val:
+        final_parts.append(ctry_val)
+
+    if not final_parts:
+        return "COULD NOT PARSE ADDRESS"
+    return ", ".join(final_parts)
+
+# --------------------------------------------------------
+# Alteryx: Read from Input #1 (DataFrame), parse, write
+# --------------------------------------------------------
+df1 = Alteryx.read("#1")  # must be configured as DataFrame
+if "postalAddresses" in df1.columns:
+    df1["Registered Address"] = df1["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df1["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df1, 1)
+
+# --------------------------------------------------------
+# Alteryx: Read from Input #2 (DataFrame), parse, write
+# --------------------------------------------------------
+df2 = Alteryx.read("#2")  # must be DataFrame
+if "postalAddresses" in df2.columns:
+    df2["Registered Address"] = df2["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df2, 2)
