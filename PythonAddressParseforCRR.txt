@@ -887,3 +887,157 @@ else:
     df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
 
 Alteryx.write(df2, 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import pandas as pd
+import re
+
+def extract_code(xml_str):
+    """
+    Returns the text between <code> and </code>, or None if not found.
+    Example: <code>REG</code> -> 'REG'
+    """
+    match = re.search(r'<code>(.*?)</code>', xml_str, flags=re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
+def extract_all_addresses(xml_str):
+    """
+    Finds all <addressN>...</addressN> pairs (e.g. <address1>Some St</address1>).
+    Returns a list of address strings in ascending numeric order of N.
+      For <address1>, <address10>, we parse out '1' and '10' as integers,
+      then sort so address1 comes before address10.
+    If none found, returns an empty list.
+    """
+    # Regex captures <address12>stuff</address12>, with '12' as group(1) and text as group(2)
+    pattern = re.compile(r'<address(\d+)>(.*?)</address\1>', flags=re.DOTALL)
+    matches = pattern.findall(xml_str)  # list of tuples: [(num_str, text), (num_str, text), ...]
+    
+    address_list = []
+    for num_str, address_text in matches:
+        address_text = address_text.strip()
+        addr_num = int(num_str)  # convert '1' => 1, etc.
+        address_list.append((addr_num, address_text))
+    
+    # Sort by the numeric part so address1 < address2 < address10
+    address_list.sort(key=lambda x: x[0])
+    
+    # Return the text in ascending order
+    return [item[1] for item in address_list]
+
+def extract_city_name(xml_str):
+    """
+    Extract <cityName>...</cityName> content. Returns None if not found.
+    """
+    match = re.search(r'<cityName>(.*?)</cityName>', xml_str, flags=re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
+def extract_postal_code(xml_str):
+    """
+    Extract <postalCode>...</postalCode> content. Returns None if not found.
+    """
+    match = re.search(r'<postalCode>(.*?)</postalCode>', xml_str, flags=re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
+def extract_country_name(xml_str):
+    """
+    Extract <countryName>...</countryName> content. Returns None if not found.
+    """
+    match = re.search(r'<countryName>(.*?)</countryName>', xml_str, flags=re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return None
+
+def parse_postal_addresses(xml_str):
+    """
+    Main orchestrator:
+    1) Check if <code>REG</code>. If not, return "COULD NOT PARSE ADDRESS".
+    2) Extract all <addressN> in ascending numeric order.
+    3) Extract <cityName>, <postalCode>, <countryName>.
+    4) Combine in the order: [all addresses], cityName, postalCode, countryName.
+    5) If nothing found, return "COULD NOT PARSE ADDRESS", else join them by comma.
+    """
+    if not xml_str or not isinstance(xml_str, str):
+        return "COULD NOT PARSE ADDRESS"
+
+    # 1) Check <code>REG</code>
+    code_val = extract_code(xml_str)
+    if code_val is None or code_val != "REG":
+        return "COULD NOT PARSE ADDRESS"
+
+    # 2) Collect all addresses
+    addresses = extract_all_addresses(xml_str)
+    # addresses is a list like ["123 Main", "Suite A"] or []
+
+    # 3) Single fields
+    city_val    = extract_city_name(xml_str)
+    postal_val  = extract_postal_code(xml_str)
+    country_val = extract_country_name(xml_str)
+
+    # 4) Combine in new order: addresses..., cityName, postalCode, countryName
+    final_parts = []
+
+    # addresses
+    final_parts.extend(addr for addr in addresses if addr)
+
+    # cityName
+    if city_val:
+        final_parts.append(city_val)
+
+    # postalCode
+    if postal_val:
+        final_parts.append(postal_val)
+
+    # countryName
+    if country_val:
+        final_parts.append(country_val)
+
+    # If final_parts is empty => no addresses & no city/postal/country => cannot parse
+    if not final_parts:
+        return "COULD NOT PARSE ADDRESS"
+
+    return ", ".join(final_parts)
+
+
+# -----------------------------------------------------------------
+# Alteryx: Read DataFrame from Input #1, parse, write to Output #1
+# -----------------------------------------------------------------
+df1 = Alteryx.read("#1")  # Ensure Input #1 is configured as "DataFrame"
+if "postalAddresses" in df1.columns:
+    df1["Registered Address"] = df1["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df1["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df1, 1)
+
+# -----------------------------------------------------------------
+# Alteryx: Read DataFrame from Input #2, parse, write to Output #2
+# -----------------------------------------------------------------
+df2 = Alteryx.read("#2")  # Ensure Input #2 is also "DataFrame"
+if "postalAddresses" in df2.columns:
+    df2["Registered Address"] = df2["postalAddresses"].apply(parse_postal_addresses)
+else:
+    df2["Registered Address"] = "COULD NOT PARSE ADDRESS"
+
+Alteryx.write(df2, 2)
