@@ -1,0 +1,49 @@
+from ayx import Alteryx, Package
+import re
+import pandas as pd
+
+df_in = Alteryx.read("#1")
+
+cusip_pattern = re.compile(r"CUSIP:\s*(\S+)\s+(.*)")
+records = []
+current_cusip = None
+current_description = None
+
+for line in df_in["POSField"]:
+    row_text = line.strip()
+    m = cusip_pattern.search(row_text)
+    if m:
+        current_cusip = m.group(1)
+        current_description = m.group(2)
+        continue
+    if "CONTRA ID" in row_text.upper() or not row_text:
+        continue
+    parts = row_text.split()
+    if len(parts) < 2:
+        continue
+    contra_id = parts[0]
+    closing_balance = parts[-1]
+    if len(parts) > 2:
+        contra_name = " ".join(parts[1:-1])
+    else:
+        contra_name = ""
+    closing_balance_abs = closing_balance.replace("+", "").replace("-", "")
+    records.append({
+        "CUSIP": current_cusip if current_cusip else "",
+        "DESCRIPTION": current_description if current_description else "",
+        "CONTRA ID": contra_id,
+        "CONTRA NAME": contra_name,
+        "CLOSING BALANCE": closing_balance,
+        "CLOSING BALANCE ABS": closing_balance_abs
+    })
+
+df_out = pd.DataFrame(records, columns=[
+    "CUSIP",
+    "DESCRIPTION",
+    "CONTRA ID",
+    "CONTRA NAME",
+    "CLOSING BALANCE",
+    "CLOSING BALANCE ABS"
+])
+
+Alteryx.write(df_out, 1)
