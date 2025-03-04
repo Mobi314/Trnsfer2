@@ -117,3 +117,120 @@ df_out = pd.DataFrame(records, columns=[
 ])
 
 Alteryx.write(df_out, 1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import re
+import pandas as pd
+
+def parse_cusip_line(line):
+    part = line.split("CUSIP:", 1)[1].lstrip()
+    # Grab CUSIP (first block of nonspace)
+    i = 0
+    while i < len(part) and part[i].isspace():
+        i += 1
+    start = i
+    while i < len(part) and not part[i].isspace():
+        i += 1
+    cusip = part[start:i]
+    # Move past spaces to find description
+    while i < len(part) and part[i].isspace():
+        i += 1
+    desc_start = i
+    # For Description, collect text until 2 consecutive spaces or end
+    while i < len(part) - 1:
+        if part[i].isspace() and part[i+1].isspace():
+            break
+        i += 1
+    description = part[desc_start:i].rstrip()
+    return cusip, description
+
+def parse_contra_line(line):
+    line = line.strip()
+    # We want 3 main pieces: ID, NAME, BAL
+    # We'll parse them manually until 2 consecutive spaces or end.
+    i = 0
+    # Skip leading spaces
+    while i < len(line) and line[i].isspace():
+        i += 1
+    # 1) CONTRA ID
+    start = i
+    while i < len(line) and not line[i].isspace():
+        i += 1
+    contra_id = line[start:i]
+    while i < len(line) and line[i].isspace():
+        i += 1
+    # 2) CONTRA NAME until 2 consecutive spaces
+    name_start = i
+    while i < len(line) - 1:
+        if line[i].isspace() and line[i+1].isspace():
+            break
+        i += 1
+    contra_name = line[name_start:i].rstrip()
+    # move i to after the 2 spaces
+    while i < len(line) and line[i].isspace():
+        i += 1
+    while i < len(line) and line[i].isspace():
+        i += 1
+    # 3) CLOSING BALANCE is what's left
+    closing_balance = line[i:].strip()
+    closing_balance_abs = closing_balance.replace("+", "").replace("-", "")
+    return contra_id, contra_name, closing_balance, closing_balance_abs
+
+df_in = Alteryx.read("#1")
+
+records = []
+in_cusip = False
+current_cusip = ""
+current_desc = ""
+
+for row in df_in["POSField"]:
+    text = row.strip()
+    if not text:
+        continue
+    if "CUSIP TOTAL" in text.upper():
+        in_cusip = False
+        current_cusip = ""
+        current_desc = ""
+        continue
+    if "CUSIP:" in text:
+        in_cusip = True
+        current_cusip, current_desc = parse_cusip_line(text)
+        continue
+    if not in_cusip:
+        continue
+    if "CONTRA ID" in text.upper():
+        continue
+    # Attempt parse of 3-block line
+    contra_id, contra_name, bal, bal_abs = parse_contra_line(text)
+    if contra_id and bal:
+        records.append({
+            "CUSIP": current_cusip,
+            "DESCRIPTION": current_desc,
+            "CONTRA ID": contra_id,
+            "CONTRA NAME": contra_name,
+            "CLOSING BALANCE": bal,
+            "CLOSING BALANCE ABS": bal_abs
+        })
+
+df_out = pd.DataFrame(records, columns=[
+    "CUSIP",
+    "DESCRIPTION",
+    "CONTRA ID",
+    "CONTRA NAME",
+    "CLOSING BALANCE",
+    "CLOSING BALANCE ABS"
+])
+
+Alteryx.write(df_out, 1)
