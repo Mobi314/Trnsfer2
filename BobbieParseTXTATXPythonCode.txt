@@ -47,3 +47,73 @@ df_out = pd.DataFrame(records, columns=[
 ])
 
 Alteryx.write(df_out, 1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+from ayx import Alteryx, Package
+import re
+import pandas as pd
+
+df_in = Alteryx.read("#1")
+
+cusip_regex = re.compile(r"CUSIP:\s*(\S+)\s+(.*)")
+records = []
+current_cusip = None
+current_description = None
+
+for line in df_in["POSField"]:
+    text = line.strip()
+    # Check if this line starts a new CUSIP record
+    match = cusip_regex.search(text)
+    if match:
+        current_cusip = match.group(1)
+        # Split out the description by looking for 2+ spaces as a cutoff
+        remainder = match.group(2)
+        desc_split = re.split(r"\s{2,}", remainder, 1)
+        current_description = desc_split[0]
+        continue
+    # Skip if blank or if it's just the header line
+    if not text or "CONTRA ID" in text.upper():
+        continue
+    # Attempt to parse the line as 3 blocks: contra id, contra name, closing balance
+    parts = text.split()
+    if len(parts) < 2:
+        continue
+    contra_id = parts[0]
+    closing_balance = parts[-1]
+    if len(parts) > 2:
+        contra_name = " ".join(parts[1:-1])
+    else:
+        contra_name = ""
+    closing_balance_abs = closing_balance.replace("+", "").replace("-", "")
+    records.append({
+        "CUSIP": current_cusip if current_cusip else "",
+        "DESCRIPTION": current_description if current_description else "",
+        "CONTRA ID": contra_id,
+        "CONTRA NAME": contra_name,
+        "CLOSING BALANCE": closing_balance,
+        "CLOSING BALANCE ABS": closing_balance_abs
+    })
+
+df_out = pd.DataFrame(records, columns=[
+    "CUSIP",
+    "DESCRIPTION",
+    "CONTRA ID",
+    "CONTRA NAME",
+    "CLOSING BALANCE",
+    "CLOSING BALANCE ABS"
+])
+
+Alteryx.write(df_out, 1)
