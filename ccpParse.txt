@@ -59,9 +59,10 @@ parse_org_business_classes()
 # Create parsed DataFrame
 df_CCP_Parsed = pd.DataFrame(parsed_rows)
 
-# Force all columns to string type (ensures compatibility with Alteryx.write)
-for col in ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification']:
-    df_CCP_Parsed[col] = df_CCP_Parsed[col].astype(str)
+# Only force types if there is actual data
+if not df_CCP_Parsed.empty:
+    for col in ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification']:
+        df_CCP_Parsed[col] = df_CCP_Parsed[col].astype(str)
 
-# Write output to first output anchor (1)
+# Write output
 Alteryx.write(df_CCP_Parsed, 1)
