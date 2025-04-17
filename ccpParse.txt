@@ -1,0 +1,63 @@
+import pandas as pd
+import xml.etree.ElementTree as ET
+
+# Placeholder for allowed classifications under domain 'CLMFO'
+allowed_clmfo_classifications = [
+    # Add your allowed classification strings here
+    "EXAMPLE1",
+    "EXAMPLE2",
+    "EXAMPLE3"
+]
+
+# Assume df_CCP is already available in the environment (as per your setup)
+# We'll create a new list to collect parsed rows
+parsed_rows = []
+
+# Iterate over each record in the dataframe
+def parse_org_business_classes():
+    for idx, row in df_CCP.iterrows():
+        xml_content = row['orgBusinessClasses']
+
+        if not xml_content or pd.isna(xml_content):
+            continue  # skip empty or NaN entries
+
+        try:
+            root = ET.fromstring(f"<root>{xml_content}</root>")  # Wrapping in a root tag in case multiple top-level nodes
+        except ET.ParseError:
+            continue  # Skip badly formed XML
+
+        for business_class in root.findall(".//businessClass"):
+            domain = business_class.findtext("domain", default="").strip()
+            classification = business_class.findtext("classification", default="").strip()
+            classification_desc = business_class.findtext("classificationDesc", default="").strip()
+            parent_classification_code = business_class.findtext("parentClassificationCode", default="").strip()
+            parent_classification = business_class.findtext("parentClassification", default="").strip()
+
+            # Determine if this businessClass meets criteria
+            if domain in ["CLMPR", "KYDNT", "ACCA"]:
+                parsed_rows.append({
+                    "domain": domain,
+                    "classification": classification,
+                    "classificationDesc": classification_desc,
+                    "parentClassificationCode": parent_classification_code,
+                    "parentClassification": parent_classification
+                })
+            elif domain == "CLMFO" and classification in allowed_clmfo_classifications:
+                parsed_rows.append({
+                    "domain": domain,
+                    "classification": classification,
+                    "classificationDesc": classification_desc,
+                    "parentClassificationCode": parent_classification_code,
+                    "parentClassification": parent_classification
+                })
+            else:
+                continue  # Does not meet criteria, skip
+
+# Execute parsing
+parse_org_business_classes()
+
+# Create new DataFrame
+df_CCP_Parsed = pd.DataFrame(parsed_rows)
+
+# Output the resulting dataframe using Alteryx's write function
+Alteryx.write(df_CCP_Parsed, 1)
