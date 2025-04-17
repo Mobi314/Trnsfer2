@@ -12,57 +12,69 @@ allowed_clmfo_classifications = [
 # List to collect parsed rows
 parsed_rows = []
 
+# Final output fields (parsed + original fields, excluding 'orgBusinessClasses')
+parsed_fields = ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification']
+
+# Function to safely extract a tag using regex
+def extract_tag_value(text, tag):
+    pattern = f'<{tag}>(.*?)</{tag}>'
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+    return match.group(1).strip() if match else ""
+
+# Function to parse using regex
 def parse_org_business_classes():
     for idx, row in df_CCP.iterrows():
         xml_content = row['orgBusinessClasses']
 
         if not xml_content or pd.isna(xml_content):
-            continue
+            continue  # Skip empty or NaN
 
-        try:
-            root = ET.fromstring(f"<root>{xml_content}</root>")
-        except ET.ParseError:
-            continue
+        # Find all businessClass sections
+        business_classes = re.findall(r'<businessClass>(.*?)</businessClass>', xml_content, re.DOTALL | re.IGNORECASE)
 
-        for business_class in root.findall(".//businessClass"):
-            domain = business_class.findtext("domain", default="").strip()
-            classification = business_class.findtext("classification", default="").strip()
-            classification_desc = business_class.findtext("classificationDesc", default="").strip()
-            parent_classification_code = business_class.findtext("parentClassificationCode", default="").strip()
-            parent_classification = business_class.findtext("parentClassification", default="").strip()
+        for bc in business_classes:
+            domain = extract_tag_value(bc, "domain")
+            classification = extract_tag_value(bc, "classification")
+            classification_desc = extract_tag_value(bc, "classificationDesc")
+            parent_classification_code = extract_tag_value(bc, "parentClassificationCode")
+            parent_classification = extract_tag_value(bc, "parentClassification")
 
+            # Apply domain/classification criteria
             if domain in ["CLMPR", "KYDNT", "ACCA"]:
-                parsed_rows.append({
-                    "domain": domain,
-                    "classification": classification,
-                    "classificationDesc": classification_desc,
-                    "parentClassificationCode": parent_classification_code,
-                    "parentClassification": parent_classification
-                })
+                pass
             elif domain == "CLMFO" and classification in allowed_clmfo_classifications:
-                parsed_rows.append({
-                    "domain": domain,
-                    "classification": classification,
-                    "classificationDesc": classification_desc,
-                    "parentClassificationCode": parent_classification_code,
-                    "parentClassification": parent_classification
-                })
+                pass
             else:
-                continue
+                continue  # Skip if not matching
+
+            # Copy original row excluding 'orgBusinessClasses'
+            base_record = row.drop(labels=['orgBusinessClasses']).to_dict()
+
+            # Add parsed fields
+            base_record.update({
+                'domain': domain,
+                'classification': classification,
+                'classificationDesc': classification_desc,
+                'parentClassificationCode': parent_classification_code,
+                'parentClassification': parent_classification
+            })
+
+            # Store
+            parsed_rows.append(base_record)
 
 # Execute parsing
 parse_org_business_classes()
 
-# List of final column names
-final_columns = ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification']
+# List of final columns = all original columns (except 'orgBusinessClasses') + parsed fields
+original_columns = [col for col in df_CCP.columns if col != 'orgBusinessClasses']
+final_columns = original_columns + parsed_fields
 
 # Create parsed DataFrame, ensuring columns exist even if empty
 df_CCP_Parsed = pd.DataFrame(parsed_rows, columns=final_columns)
 
-# Force string type
-for col in final_columns:
+# Force all columns to string type
+for col in df_CCP_Parsed.columns:
     df_CCP_Parsed[col] = df_CCP_Parsed[col].astype(str)
 
 # Output
-Alteryx.write(df_CCP_Parsed, 1)
 Alteryx.write(df_CCP_Parsed, 1)
