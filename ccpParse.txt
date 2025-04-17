@@ -9,22 +9,22 @@ allowed_clmfo_classifications = [
     "EXAMPLE3"
 ]
 
-# Assume df_CCP is already available in the environment (as per your setup)
-# We'll create a new list to collect parsed rows
+# List to collect parsed rows
 parsed_rows = []
 
-# Iterate over each record in the dataframe
+# Function to parse orgBusinessClasses
 def parse_org_business_classes():
     for idx, row in df_CCP.iterrows():
         xml_content = row['orgBusinessClasses']
 
         if not xml_content or pd.isna(xml_content):
-            continue  # skip empty or NaN entries
+            continue  # Skip empty or NaN entries
 
         try:
-            root = ET.fromstring(f"<root>{xml_content}</root>")  # Wrapping in a root tag in case multiple top-level nodes
+            # Wrap XML with root tag in case multiple top-level elements
+            root = ET.fromstring(f"<root>{xml_content}</root>")
         except ET.ParseError:
-            continue  # Skip badly formed XML
+            continue  # Skip malformed XML
 
         for business_class in root.findall(".//businessClass"):
             domain = business_class.findtext("domain", default="").strip()
@@ -33,7 +33,7 @@ def parse_org_business_classes():
             parent_classification_code = business_class.findtext("parentClassificationCode", default="").strip()
             parent_classification = business_class.findtext("parentClassification", default="").strip()
 
-            # Determine if this businessClass meets criteria
+            # Apply domain and classification rules
             if domain in ["CLMPR", "KYDNT", "ACCA"]:
                 parsed_rows.append({
                     "domain": domain,
@@ -51,22 +51,17 @@ def parse_org_business_classes():
                     "parentClassification": parent_classification
                 })
             else:
-                continue  # Does not meet criteria, skip
+                continue  # Does not meet criteria
 
 # Execute parsing
 parse_org_business_classes()
 
-# Create new DataFrame
+# Create parsed DataFrame
 df_CCP_Parsed = pd.DataFrame(parsed_rows)
 
-# Create metadata dictionary
-metadata = {
-    'domain': {'type': 'V_String', 'size': 254},
-    'classification': {'type': 'V_String', 'size': 254},
-    'classificationDesc': {'type': 'V_String', 'size': 254},
-    'parentClassificationCode': {'type': 'V_String', 'size': 254},
-    'parentClassification': {'type': 'V_String', 'size': 254}
-}
+# Force all columns to string type (ensures compatibility with Alteryx.write)
+for col in ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification']:
+    df_CCP_Parsed[col] = df_CCP_Parsed[col].astype(str)
 
-# Output the resulting dataframe using Alteryx's write function
-Alteryx.write(df_CCP_Parsed, 1, metadata=metadata)
+# Write output to first output anchor (1)
+Alteryx.write(df_CCP_Parsed, 1)
