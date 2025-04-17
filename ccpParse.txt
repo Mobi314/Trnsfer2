@@ -12,19 +12,17 @@ allowed_clmfo_classifications = [
 # List to collect parsed rows
 parsed_rows = []
 
-# Function to parse orgBusinessClasses
 def parse_org_business_classes():
     for idx, row in df_CCP.iterrows():
         xml_content = row['orgBusinessClasses']
 
         if not xml_content or pd.isna(xml_content):
-            continue  # Skip empty or NaN entries
+            continue
 
         try:
-            # Wrap XML with root tag in case multiple top-level elements
             root = ET.fromstring(f"<root>{xml_content}</root>")
         except ET.ParseError:
-            continue  # Skip malformed XML
+            continue
 
         for business_class in root.findall(".//businessClass"):
             domain = business_class.findtext("domain", default="").strip()
@@ -33,7 +31,6 @@ def parse_org_business_classes():
             parent_classification_code = business_class.findtext("parentClassificationCode", default="").strip()
             parent_classification = business_class.findtext("parentClassification", default="").strip()
 
-            # Apply domain and classification rules
             if domain in ["CLMPR", "KYDNT", "ACCA"]:
                 parsed_rows.append({
                     "domain": domain,
@@ -51,18 +48,21 @@ def parse_org_business_classes():
                     "parentClassification": parent_classification
                 })
             else:
-                continue  # Does not meet criteria
+                continue
 
 # Execute parsing
 parse_org_business_classes()
 
-# Create parsed DataFrame
-df_CCP_Parsed = pd.DataFrame(parsed_rows)
+# List of final column names
+final_columns = ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification']
 
-# Only force types if there is actual data
-if not df_CCP_Parsed.empty:
-    for col in ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification']:
-        df_CCP_Parsed[col] = df_CCP_Parsed[col].astype(str)
+# Create parsed DataFrame, ensuring columns exist even if empty
+df_CCP_Parsed = pd.DataFrame(parsed_rows, columns=final_columns)
 
-# Write output
+# Force string type
+for col in final_columns:
+    df_CCP_Parsed[col] = df_CCP_Parsed[col].astype(str)
+
+# Output
+Alteryx.write(df_CCP_Parsed, 1)
 Alteryx.write(df_CCP_Parsed, 1)
