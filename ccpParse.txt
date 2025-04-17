@@ -59,5 +59,14 @@ parse_org_business_classes()
 # Create new DataFrame
 df_CCP_Parsed = pd.DataFrame(parsed_rows)
 
+# Create metadata dictionary
+metadata = {
+    'domain': {'type': 'V_String', 'size': 254},
+    'classification': {'type': 'V_String', 'size': 254},
+    'classificationDesc': {'type': 'V_String', 'size': 254},
+    'parentClassificationCode': {'type': 'V_String', 'size': 254},
+    'parentClassification': {'type': 'V_String', 'size': 254}
+}
+
 # Output the resulting dataframe using Alteryx's write function
-Alteryx.write(df_CCP_Parsed, 1)
+Alteryx.write(df_CCP_Parsed, 1, metadata=metadata)
