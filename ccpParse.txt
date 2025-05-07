@@ -78,3 +78,112 @@ for col in df_CCP_Parsed.columns:
 
 # Output
 Alteryx.write(df_CCP_Parsed, 1)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import re
+from ayx import Alteryx
+
+# Placeholder for allowed classifications under domain 'CLMFO'
+allowed_clmfo_classifications = [
+    "EXAMPLE1",
+    "EXAMPLE2",
+    "EXAMPLE3"
+]
+
+parsed_rows = []
+
+# Fields to extract from orgBusinessClasses
+parsed_fields = ['domain', 'classification', 'classificationDesc', 'parentClassificationCode', 'parentClassification', 'Review Date']
+
+# Extract specific tag value from a text block
+def extract_tag_value(text, tag):
+    pattern = f'<{tag}>(.*?)</{tag}>'
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+    return match.group(1).strip() if match else ""
+
+# Extract "Review Date" from orgStatus
+def extract_review_date(org_status_text):
+    if not org_status_text or pd.isna(org_status_text):
+        return ""
+    
+    # Find all <GenericAttribute> blocks
+    blocks = re.findall(r'<GenericAttribute>(.*?)</GenericAttribute>', org_status_text, re.DOTALL | re.IGNORECASE)
+    
+    for block in blocks:
+        description = extract_tag_value(block, "description")
+        if "Rolling Review Date" in description:
+            return extract_tag_value(block, "date")
+    
+    return ""
+
+# Main parsing logic
+def parse_org_business_classes():
+    for idx, row in df_CCP.iterrows():
+        xml_content = row['orgBusinessClasses']
+        org_status_content = row.get('orgStatus', "")
+
+        if not xml_content or pd.isna(xml_content):
+            continue
+
+        business_classes = re.findall(r'<businessClass>(.*?)</businessClass>', xml_content, re.DOTALL | re.IGNORECASE)
+
+        for bc in business_classes:
+            domain = extract_tag_value(bc, "domain")
+            classification = extract_tag_value(bc, "classification")
+            classification_desc = extract_tag_value(bc, "classificationDesc")
+            parent_classification_code = extract_tag_value(bc, "parentClassificationCode")
+            parent_classification = extract_tag_value(bc, "parentClassification")
+
+            if domain in ["CLMPR", "KYDNT", "ACCA"]:
+                pass
+            elif domain == "CLMFO" and classification in allowed_clmfo_classifications:
+                pass
+            else:
+                continue
+
+            # Get original data except XML fields
+            base_record = row.drop(labels=['orgBusinessClasses', 'orgStatus']).to_dict()
+
+            # Add parsed fields
+            base_record.update({
+                'domain': domain,
+                'classification': classification,
+                'classificationDesc': classification_desc,
+                'parentClassificationCode': parent_classification_code,
+                'parentClassification': parent_classification,
+                'Review Date': extract_review_date(org_status_content)
+            })
+
+            parsed_rows.append(base_record)
+
+# Run it
+parse_org_business_classes()
+
+# Define final output columns
+original_columns = [col for col in df_CCP.columns if col not in ['orgBusinessClasses', 'orgStatus']]
+final_columns = original_columns + parsed_fields
+
+# Build output DataFrame
+df_CCP_Parsed = pd.DataFrame(parsed_rows, columns=final_columns)
+
+# Force all fields to string type
+for col in df_CCP_Parsed.columns:
+    df_CCP_Parsed[col] = df_CCP_Parsed[col].astype(str)
+
+# Write to Alteryx
+Alteryx.write(df_CCP_Parsed, 1)
