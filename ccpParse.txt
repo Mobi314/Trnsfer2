@@ -321,3 +321,96 @@ for col in df_CCP_Review.columns:
     df_CCP_Review[col] = df_CCP_Review[col].astype(str)
 
 Alteryx.write(df_CCP_Review, 3)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 🔍 Unified parser for Review Date + Risk fields
+def extract_status_fields(org_status_text):
+    result = {
+        "Review Date": "",
+        "riskRating": "",
+        "riskDescription": "",
+        "riskReviewDate": ""
+    }
+
+    if not org_status_text or pd.isna(org_status_text):
+        return result
+
+    # Get all <GenericAttribute> blocks
+    blocks = re.findall(r'<GenericAttribute>(.*?)</GenericAttribute>', org_status_text, re.DOTALL | re.IGNORECASE)
+
+    for block in blocks:
+        attr_name = extract_tag_value(block, "attributeName")
+        description = extract_tag_value(block, "description")
+        date = extract_tag_value(block, "date")
+
+        # Rolling Review Date (as before)
+        if not result["Review Date"] and "Rolling Review Date" in description:
+            result["Review Date"] = date
+
+        # Risk rating (if not yet filled)
+        if not result["riskRating"] and any(code in attr_name for code in ["HR", "MH", "MR", "LR"]):
+            result["riskRating"] = attr_name
+            result["riskDescription"] = description
+            result["riskReviewDate"] = date
+
+        # Stop early if all found
+        if all(result.values()):
+            break
+
+    return result
+
+# ====================================
+# Modified Output 3: Full Population + Status Fields
+# ====================================
+def parse_review_dates_only():
+    output_rows = []
+
+    for idx, row in df_CCP.iterrows():
+        status_data = extract_status_fields(row.get("orgStatus", ""))
+
+        base_record = row.drop(labels=["orgBusinessClasses", "orgStatus"]).to_dict()
+        base_record.update(status_data)
+
+        # Optional: Uncomment if businessClass parsing is also required for Output #3
+        # bc_xml = row.get("orgBusinessClasses", "")
+        # business_classes = re.findall(r'<businessClass>(.*?)</businessClass>', bc_xml, re.DOTALL | re.IGNORECASE)
+        # for bc in business_classes:
+        #     domain = extract_tag_value(bc, "domain")
+        #     classification = extract_tag_value(bc, "classification")
+        #     ... append fields if needed ...
+
+        output_rows.append(base_record)
+
+    return output_rows
+
+# Execute Output 3: full population with Review Date + Risk fields
+review_rows = parse_review_dates_only()
+
+final_columns_3 = [col for col in df_CCP.columns if col not in ['orgBusinessClasses', 'orgStatus']]
+final_columns_3 += ["Review Date", "riskRating", "riskDescription", "riskReviewDate"]
+
+df_CCP_Review = pd.DataFrame(review_rows, columns=final_columns_3)
+for col in df_CCP_Review.columns:
+    df_CCP_Review[col] = df_CCP_Review[col].astype(str)
+
+Alteryx.write(df_CCP_Review, 3)
