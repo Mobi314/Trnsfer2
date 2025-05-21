@@ -368,7 +368,7 @@ def extract_status_fields(org_status_text):
             result["Review Date"] = date
 
         # Risk rating (if not yet filled)
-        if not result["riskRating"] and any(code in attr_name for code in ["HR", "MH", "MR", "LR"]):
+        if not result["riskRating"] and attr_name.strip().upper() in ["HR", "MH", "MR", "LR"]:
             result["riskRating"] = attr_name
             result["riskDescription"] = description
             result["riskReviewDate"] = date
