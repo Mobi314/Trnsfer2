@@ -104,3 +104,4 @@ df_RM_filtered  = filter_and_expand(df_RM_RSSTC)
 
 Alteryx.write(df_RDM_filtered, 1)
 Alteryx.write(df_RM_filtered, 2)
+
