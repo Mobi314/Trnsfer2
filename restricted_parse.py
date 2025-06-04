@@ -67,26 +67,33 @@ Alteryx.write(df_RM_filtered, 2)
 
 
 
+import re
+import pandas as pd
+
+# Precompile regexes
+generic_re = re.compile(r"<GenericAttribute\b[^>]*>(.*?)</GenericAttribute>", re.DOTALL)
+attr_re    = re.compile(r"<attributeName>\s*(.*?)\s*</attributeName>", re.DOTALL)
+desc_re    = re.compile(r"<description>\s*(.*?)\s*</description>", re.DOTALL)
+date_re    = re.compile(r"<date>\s*(.*?)\s*</date>", re.DOTALL)
+
 def extract_rsstc_attrs(xml_string):
     if not isinstance(xml_string, str):
         return None
-    try:
-        root = ET.fromstring(xml_string)
-    except ET.ParseError:
-        return None
+    for block in generic_re.findall(xml_string):
+        name_match = attr_re.search(block)
+        desc_match = desc_re.search(block)
+        date_match = date_re.search(block)
 
-    for ga in root.findall(".//GenericAttribute"):
-        name_val = ga.findtext("attributeName")
-        desc_val = ga.findtext("description")
-        date_val = ga.findtext("date")
+        name_val = name_match.group(1).strip() if name_match else None
+        desc_val = desc_match.group(1).strip() if desc_match else None
+        date_val = date_match.group(1).strip() if date_match else None
 
-        if (name_val and "RSSTC" in name_val) or (desc_val and desc_val.strip() == "Restricted"):
+        if (name_val and "RSSTC" in name_val) or (desc_val and desc_val == "Restricted"):
             return {"attributeName": name_val, "description": desc_val, "date": date_val}
     return None
 
 def filter_and_expand(df):
     parsed = df["orgStatus"].apply(extract_rsstc_attrs)
-
     df = df.copy()
     df["attributeName"] = None
     df["description"]   = None
@@ -104,4 +111,3 @@ df_RM_filtered  = filter_and_expand(df_RM_RSSTC)
 
 Alteryx.write(df_RDM_filtered, 1)
 Alteryx.write(df_RM_filtered, 2)
-
