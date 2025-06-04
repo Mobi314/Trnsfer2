@@ -111,3 +111,42 @@ df_RM_filtered  = filter_and_expand(df_RM_RSSTC)
 
 Alteryx.write(df_RDM_filtered, 1)
 Alteryx.write(df_RM_filtered, 2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+I have two pandas data frames I have created called df_RDM_RSSTC and df_RM_RSSTC. Both of these dataframes have a field called ‘orgStatus’. This field is a string field that contained XML code in <></> style brackets. We will need to use regex to parse this field in order to grab new fields and add them to each record/row of the dataframe. The new fields are called ‘attributeName’, ‘description’, and ‘date’. There are some caveats we need to explore, but before we do that, let me show you the structure and what we will need to parse.
+The values can be found in the XML in the group called <orgStatus></orgStatus>, and it is structured like this:
+<orgStatus>
+<GenericAttribute>
+<attributeName>...some data...</attributeName>
+<description>...some data...</description>
+<date>...some data...</date>
+</GenericAttribute>
+<GenericAttribute>
+...some data...
+</GenericAttribute>
+<GenericAttribute>
+<attributeName>RSSTC</attributeName>
+<description>Restricted</description>
+<date>date value </date>
+</GenericAttribute>
+</orgStatus>
+As you can see from the structure, the value we are looking is in these brackets <attributeName> </attributeName>, <description> </description>, <date> </date> which are all inside <GenericAttribute></GenericAttribute>.
+We will only add the value to each record if and only if the <attributeName> contains the string ‘RSSTC’ or if the description says ‘Restricted’. If it meets this condition, then we can add the description and date values.
+If not, we can skip it. If a record does not contain any tags with a match, we can drop that record. All I want at the end of this is an output of attributeNames that match RSSTC or a description that is Restricted.
+I want this to output to alteryx like this Alteryx.write(df_example,1) and I need to do this for both dataframes (RDM goes to 1, RM goes to 2). Let me know if you need more information!
